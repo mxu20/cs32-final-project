@@ -11,8 +11,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import schedule
 
+# Create a dictionary 
+URL = {"https://www.aljazeera.com/", "https://www.bbc.com/news", "https://www.reuters.com/", "https://www.scmp.com/", "https://apnews.com/world-news"}
+
 # HTTP Get request to website
-URL = "https://www.aljazeera.com/"
 r = requests.get(URL)
 print(r.content)
 
@@ -21,18 +23,21 @@ soup = BeautifulSoup(r.content, 'html.parser')
 
 # Get relevant information from the website
 news = []
-articlelist = soup.find_all('article')
+articlelist = soup.find('article')
 
-# Loop to find all urls of articles on the front page
+# Loop to find urls of articles on the front page
+i = 0
 for item in articlelist:
-    for link in item.find_all('a', href = True):
+    for link in item.find('a', href = True):
         news.append(link['href'])
+        i += 1
+        if i > 3:
+            break
 news = list(set(news))
 
 # Put article data in a csv
 df = pd.DataFrame(news)
 df.to_csv (r'C:\Users\meimeixu@Zhimeis-MacBook-Pro\Downloads\news.csv', index = False, header = True)
-
 
 def extract_date_and_title(link):
     # Define the pattern to match the date and title
@@ -48,15 +53,17 @@ def extract_date_and_title(link):
         return date, title
     else:
         return None, None
-
-for i in df['link']:
-    date, title = extract_date_and_title(i)
     
-    if date and title:
-        print("Date:", date)
-        print("Title:", title)
-    else:
-        print("Invalid link format.")
+def extract_date_and_title(link):
+
+    for i in df['0']: # needs to be fixed so that we're not using df and so that 'link' works
+        date, title = extract_date_and_title(i)
+        
+        if date and title:
+            print("Date:", date)
+            print("Title:", title)
+        else:
+            print("Invalid link format.")
         
 def send_email(subject, body):
     from_email = "your_email@gmail.com"  # Update with your email
