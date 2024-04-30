@@ -10,92 +10,133 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import schedule
+import json
+
 
 # Create a dictionary 
-URL = {"https://www.aljazeera.com/", "https://www.bbc.com/news", "https://www.reuters.com/", "https://www.scmp.com/", "https://apnews.com/world-news"}
+URL = [
+    ("https://www.aljazeera.com/", "Al Jazeera"),
+    ("https://www.bbc.com/news", "BBC"),
+    # ("https://www.reuters.com/", "Reuters"),
+    # ("https://www.scmp.com/", "SCMP"),
+    # ("https://apnews.com/world-news", "AP News")
+       ]
 
+news = []
 # HTTP Get request to website
-r = requests.get(URL)
-print(r.content)
+for url, source in URL:
+    r = requests.get(url)
+    # print(r.content)
 
 # Parse content
-soup = BeautifulSoup(r.content, 'html.parser')
+    soup = BeautifulSoup(r.content, 'html.parser')
 
-# Get relevant information from the website
-news = []
-articlelist = soup.find('article')
+    # Get relevant information from the website
+    
+    articlelist = soup.find_all('article')
+    # count = 0
+    for article in articlelist:
+        link = article.find('a', href = True)
+        if link:
+            news.append((source, link['href']))
 
-# Loop to find urls of articles on the front page
-i = 0
-for item in articlelist:
-    for link in item.find('a', href = True):
-        news.append(link['href'])
-        i += 1
-        if i > 3:
-            break
-news = list(set(news))
+            # count += 1
+            # if count == 3:
+            #     break
+#     news.append(articlelist)
+#to limit to 3 articles
+# news = news[:3]
+# remove duplicates
+# news = list(set(news))
+# news = news[:12]
 
-# Put article data in a csv
-df = pd.DataFrame(news)
-df.to_csv (r'C:\Users\meimeixu@Zhimeis-MacBook-Pro\Downloads\news.csv', index = False, header = True)
+# print(news)
+# # Put article data in a csv to check above fn works
+# df = pd.DataFrame(news)
+# df.to_csv (r'C:\Users\meimeixu@Zhimeis-MacBook-Pro\Downloads\news.csv', index = False, header = True)
 
-def extract_date_and_title(link):
+data = json.loads(soup.select_one("#__NEXT_DATA__").text)
+
+def extract_title(news):
+    extracted = []
     # Define the pattern to match the date and title
-    pattern = r"/news/(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/(?P<title>[\w-]+)"
+    for name, link in news:
     
-    # Use regular expression to find matches
-    match = re.match(pattern, link)
-    
-    if match:
-        # Extract the matched groups
-        date = f"{match.group('year')}-{match.group('month')}-{match.group('day')}"
-        title = match.group('title').replace('-', ' ')
-        return date, title
-    else:
-        return None, None
-    
-def extract_date_and_title(link):
+        if name == "Al Jazeera":
+            
+            pattern = r"/news/(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/(?P<title>[\w-]+)"
+            # print(link)
+            match = re.match(pattern, link)
+            
+            if match:
+                # Extract the matched groups
+                title = match.group('title').replace('-', ' ')
+                extracted.append(title)
+            # else:
+            #     return None
 
-    for i in df['0']: # needs to be fixed so that we're not using df and so that 'link' works
-        date, title = extract_date_and_title(i)
+        if name == "BBC":
+            page = next(
+                v for k, v in data["props"]["pageProps"]["page"].items() if k.startswith("@"))
+            for c in page["contents"]:
+                match c["type"]:
+                    case "headline":
+                        print(c["model"]["blocks"][0]["model"]["text"])
+            print()
+    return extracted
+    # # elif "bbc.com" in link:
+    # #     pattern = r"/" # The URL doesn't contain the title
+    # # elif "reuters.com" in link:
+    # #     pattern = r"/(?P<desk>)/(?P<region>)/(?P<title>[w-]+)-2024-04-26/"
+    # # elif "scmp.com" in link:
+    # #     pattern = r"news/china/diplomacy/article/3260454/(?P<title>[w-]+)g?module=top_story&pgtype=homepage"
+    
+    # # Use regular expression to find matches
+    #         
+    
+title = extract_title(news)
+print(title)
+# def extract_title(link):
+
+#     for i in df['0']: # needs to be fixed so that we're not using df and so that 'link' works
+#         date, title = extract_date_and_title(i)
         
-        if date and title:
-            print("Date:", date)
-            print("Title:", title)
-        else:
-            print("Invalid link format.")
+#         if date and title:
+#             print("Date:", date)
+#             print("Title:", title)
+#         else:
+#             print("Invalid link format.")
         
 def send_email(subject, body):
     from_email = "your_email@gmail.com"  # Update with your email
     to_email = "recipient_email@example.com"  # Update with recipient's email
-
     msg = MIMEMultipart()
     msg['From'] = from_email
     msg['To'] = to_email
     msg['Subject'] = subject
 
-    msg.attach(MIMEText(body, 'plain'))
+#     msg.attach(MIMEText(body, 'plain'))
 
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.starttls()
-    server.login(from_email, "your_password")  # Update with your password
-    text = msg.as_string()
-    server.sendmail(from_email, to_email, text)
-    server.quit()
+#     server = smtplib.SMTP('smtp.gmail.com', 587)
+#     server.starttls()
+#     server.login(from_email, "your_password")  # Update with your password
+#     text = msg.as_string()
+#     server.sendmail(from_email, to_email, text)
+#     server.quit()
     
 def compose_email_body(df):
-    body = "Today's News Headlines:\n\n" #here she can flesh out the full message
+    body = "Today's News Headlines:\n\n Today is ['date']. Here are the top stories from around the world."
     for index, row in df.iterrows():
-        body += f"{row['date']}: {row['title']}\n"
-    return body
+         body += f"{row['date']}: {row['title']}\n"
+#     return body
 
-# Function to fetch news, compose email body, and send email
+# # Function to fetch news, compose email body, and send email
 def send_news_email():
     body = compose_email_body(df)
     send_email("Daily News Digest", body)
 
 
-# Schedule to fetch news and send email daily at 8 AM
+# # Schedule to fetch news and send email daily at 8 AM
 schedule.every().day.at("08:00").do(send_news_email)
 
 while True:
